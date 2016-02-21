@@ -44,10 +44,9 @@
 
 class LiquidCrystalShift : public Print {
 public:
-  LiquidCrystalShift(uint8_t rs, uint8_t enable,
-    uint8_t serclk, uint8_t serdata, uint8_t latch);
+  LiquidCrystalShift(uint8_t serclk, uint8_t serdata, uint8_t latch);
 
-  void init(uint8_t fourbitmode, uint8_t rs, uint8_t rw, uint8_t enable,
+  void init(uint8_t fourbitmode, uint8_t rw,
 	    uint8_t serclk, uint8_t serdata, uint8_t latch);
 
   void begin(uint8_t cols, uint8_t rows, uint8_t charsize = LCD_5x8DOTS);
@@ -76,6 +75,9 @@ public:
 
   using Print::write;
 private:
+  void shiftFlush();
+  void shiftSet(int pin, int value);
+  void shiftWrite(int pin, int value);
   void send(uint8_t, uint8_t);
   void write4bits(uint8_t);
   void write8bits(uint8_t);
@@ -84,6 +86,8 @@ private:
   uint8_t _rs_pin; // LOW: command.  HIGH: character.
   uint8_t _rw_pin; // LOW: write to LCD.  HIGH: read from LCD.
   uint8_t _enable_pin; // activated by a HIGH pulse.
+  bool pulse;
+  uint8_t _serialbuffer;
   uint8_t _serdata;
   uint8_t _serclk;
   uint8_t _latch;

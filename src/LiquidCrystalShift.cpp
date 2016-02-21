@@ -24,17 +24,18 @@
 // can't assume that its in that state when a sketch starts (and the
 // LiquidCrystalShift constructor is called).
 
-LiquidCrystalShift::LiquidCrystalShift(uint8_t rs, uint8_t enable, uint8_t serclk, uint8_t serdata, uint8_t latch)
+LiquidCrystalShift::LiquidCrystalShift(uint8_t serclk, uint8_t serdata, uint8_t latch)
 {
-  init(0, rs, 255, enable, serclk, serdata, latch);
+  init(1, 255, serclk, serdata, latch);
 }
 
-void LiquidCrystalShift::init(uint8_t fourbitmode, uint8_t rs, uint8_t rw, uint8_t enable,
+void LiquidCrystalShift::init(uint8_t fourbitmode, uint8_t rw,
 			 uint8_t serclk, uint8_t serdata, uint8_t latch)
 {
-  _rs_pin = rs;
   _rw_pin = rw;
-  _enable_pin = enable;
+
+  _rs_pin = 2;
+  _enable_pin = 3;
 
 	_serclk = serclk;
 	_serdata = serdata;
@@ -46,6 +47,28 @@ void LiquidCrystalShift::init(uint8_t fourbitmode, uint8_t rs, uint8_t rw, uint8
     _displayfunction = LCD_8BITMODE | LCD_1LINE | LCD_5x8DOTS;
 
   // begin(16, 1);
+}
+
+void LiquidCrystalShift::shiftFlush()
+{
+  digitalWrite(_latch, LOW);
+	shiftOut(_serdata, _serclk, LSBFIRST, _serialbuffer);
+  digitalWrite(_latch, HIGH);
+}
+
+void LiquidCrystalShift::shiftSet(int pin, int value)
+{
+  if (value == LOW) {
+    _serialbuffer &= ~(1 << pin);
+  } else {
+    _serialbuffer |= 1 << pin;
+  }
+}
+
+void LiquidCrystalShift::shiftWrite(int pin, int value)
+{
+  shiftSet(pin, value);
+  shiftFlush();
 }
 
 void LiquidCrystalShift::begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
@@ -61,12 +84,10 @@ void LiquidCrystalShift::begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
     _displayfunction |= LCD_5x10DOTS;
   }
 
-  pinMode(_rs_pin, OUTPUT);
   // we can save 1 pin by not using RW. Indicate by passing 255 instead of pin#
   if (_rw_pin != 255) {
     pinMode(_rw_pin, OUTPUT);
   }
-  pinMode(_enable_pin, OUTPUT);
   pinMode(_serdata, OUTPUT);
   pinMode(_serclk, OUTPUT);
   pinMode(_latch, OUTPUT);
@@ -77,8 +98,8 @@ void LiquidCrystalShift::begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
   // before sending commands. Arduino can turn on way before 4.5V so we'll wait 50
   delayMicroseconds(50000);
   // Now we pull both RS and R/W low to begin commands
-  digitalWrite(_rs_pin, LOW);
-  digitalWrite(_enable_pin, LOW);
+  shiftWrite(_rs_pin, LOW);
+  shiftWrite(_enable_pin, LOW);
   if (_rw_pin != 255) {
     digitalWrite(_rw_pin, LOW);
   }
@@ -256,8 +277,7 @@ inline size_t LiquidCrystalShift::write(uint8_t value) {
 
 // write either command or data, with automatic 4/8-bit selection
 void LiquidCrystalShift::send(uint8_t value, uint8_t mode) {
-  digitalWrite(_rs_pin, mode);
-
+  shiftWrite(_rs_pin, mode);
   // if there is a RW pin indicated, set it low to Write
   if (_rw_pin != 255) {
     digitalWrite(_rw_pin, LOW);
@@ -271,19 +291,24 @@ void LiquidCrystalShift::send(uint8_t value, uint8_t mode) {
   }
 }
 
+
 void LiquidCrystalShift::pulseEnable(void) {
-  digitalWrite(_enable_pin, LOW);
+  pulse = true;
+  shiftWrite(_enable_pin, LOW);
   delayMicroseconds(1);
-  digitalWrite(_enable_pin, HIGH);
+  shiftWrite(_enable_pin, HIGH);
   delayMicroseconds(1);    // enable pulse must be >450ns
-  digitalWrite(_enable_pin, LOW);
+  shiftWrite(_enable_pin, LOW);
+  pulse = false;
   delayMicroseconds(100);   // commands need > 37us to settle
 }
 
 void LiquidCrystalShift::write4bits(uint8_t value) {
-	digitalWrite(_latch, LOW);
-	shiftOut(_serdata, _serclk, LSBFIRST, value);
-	digitalWrite(_latch, HIGH);
+	// digitalWrite(_latch, LOW);
+	// shiftOut(_serdata, _serclk, LSBFIRST, value);
+	// digitalWrite(_latch, HIGH);
+  _serialbuffer = (_serialbuffer & 0x0F) | ((value << 4) & 0xF0);
+  shiftFlush();
 
   pulseEnable();
 }
@@ -293,11 +318,11 @@ void LiquidCrystalShift::write8bits(uint8_t value) {
   //   digitalWrite(_data_pins[i], (value >> i) & 0x01);
   // }
 
-	digitalWrite(_latch, LOW);
-	shiftOut(_serdata, _serclk, LSBFIRST, value);
-  digitalWrite(_latch, HIGH);
-  delayMicroseconds(100);
-  digitalWrite(_latch, LOW);
+	// digitalWrite(_latch, LOW);
+	// shiftOut(_serdata, _serclk, LSBFIRST, value);
+  // digitalWrite(_latch, HIGH);
+  // delayMicroseconds(100);
+  // digitalWrite(_latch, LOW);
 
-  pulseEnable();
+  // pulseEnable();
 }
